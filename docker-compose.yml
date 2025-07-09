@@ -1,0 +1,64 @@
+services:
+  keycloak-db:
+    image: postgres:latest
+    container_name: keycloakdb
+    restart: unless-stopped
+    environment: 
+      POSTGRES_DB: keycloak_poc
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    restart: unless-stopped
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak_poc
+      KC_DB_USERNAME: admin
+      KC_DB_PASSWORD: admin
+    depends_on:
+      - keycloak-db
+    ports:
+      - "8080:8080"
+
+  backend:
+    build:
+      context: ./backend
+    container_name: backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - keycloak
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./backend:/app
+    command: npm run start:dev      
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
+    environment:
+      KEYCLOAK_ID: my-nextjs-app
+      KEYCLOAK_SECRET: ZPVIZx49XIg3BR4A9wQzac6X6OChmXkG
+      KEYCLOAK_ISSUER: http://localhost:8080/realms/myrealm
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: O8uiWrdMPgLjlhhakFNV0viQv26g4Vmxt2ZBiWXD6H0
+    volumes:
+      - ./frontend:/app
+    command: npm run dev
+
+volumes:
+  keycloak-db-data:
